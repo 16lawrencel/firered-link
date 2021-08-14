@@ -77,12 +77,19 @@ struct PokemonSubstruct3
  /* 0x0B */ u32 eventLegal:1; // controls Mew & Deoxys obedience; if set, Pokémon is a fateful encounter in FRLG & Gen 4+ summary screens; set for in-game event island legendaries, some distributed events, and Pokémon from XD: Gale of Darkness.
 };
 
+struct PokemonSubstruct4
+{
+    u16 abilities[4];
+    // TODO: add more fields here, e.g. whether move/ability is native
+};
+
 union PokemonSubstruct
 {
     struct PokemonSubstruct0 type0;
     struct PokemonSubstruct1 type1;
     struct PokemonSubstruct2 type2;
     struct PokemonSubstruct3 type3;
+    struct PokemonSubstruct4 type4;
     u16 raw[6];
 };
 
@@ -103,8 +110,8 @@ struct BoxPokemon
 
     union
     {
-        u32 raw[12];
-        union PokemonSubstruct substructs[4];
+        u32 raw[15];
+        union PokemonSubstruct substructs[5];
     } secure;
 };
 
