@@ -1502,6 +1502,7 @@ extern const u8 gText_ItGotAway[];
 
 // pokemon_summary_screen
 extern const u8 gText_PokeSum_PageName_KnownMoves[];
+extern const u8 gText_PokeSum_PageName_EquippedAbilities[];
 extern const u8 gText_PokeSum_Controls_PickSwitch[];
 extern const u8 gText_PokeSum_Controls_Pick[];
 extern const u8 gText_PokeSum_NoData[];

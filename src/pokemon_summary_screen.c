@@ -37,6 +37,8 @@
 // needs conflicting header to match (curIndex is s8 in the function, but has to be defined as u8 here)
 extern s16 SeekToNextMonInBox(struct BoxPokemon * boxMons, u8 curIndex, u8 maxIndex, u8 flags);
 
+static u8 PokeSum_EffectiveFlipDirection(void);
+static u8 PokeSum_GetOldPage(void);
 static void BufferSelectedMonData(struct Pokemon * mon);
 static void CB2_SetUpPSS(void);
 static void PokeSum_TryPlayMonCry(void);
@@ -1021,6 +1023,7 @@ void ShowPokemonSummaryScreen(struct Pokemon * party, u8 cursorPos, u8 lastIdx, 
         sMonSummaryScreen->isBoxMon = FALSE;
         sMonSummaryScreen->lockMovesFlag = TRUE;
         break;
+    // TODO: add case for mode select ability / learn ability
     }
 
     sMonSummaryScreen->state3270 = 0;
@@ -1043,7 +1046,7 @@ void ShowPokemonSummaryScreen(struct Pokemon * party, u8 cursorPos, u8 lastIdx, 
     if (sMonSummaryScreen->isBadEgg == TRUE)
         sMonSummaryScreen->isEgg = TRUE;
 
-    sMonSummaryScreen->lastPageFlipDirection = 0xff;
+    sMonSummaryScreen->lastPageFlipDirection = PSS_FLIP_OFF;
     SetMainCallback2(CB2_SetUpPSS);
 }
 
@@ -1066,9 +1069,9 @@ bool32 IsPageFlipInput(u8 direction)
     if (sMonSummaryScreen->isEgg)
         return FALSE;
 
-    if (sMonSummaryScreen->lastPageFlipDirection != 0xff && sMonSummaryScreen->lastPageFlipDirection == direction)
+    if (sMonSummaryScreen->lastPageFlipDirection != PSS_FLIP_OFF && sMonSummaryScreen->lastPageFlipDirection == direction)
     {
-        sMonSummaryScreen->lastPageFlipDirection = 0xff;
+        sMonSummaryScreen->lastPageFlipDirection = PSS_FLIP_OFF;
         return TRUE;
     }
 
@@ -1077,7 +1080,7 @@ bool32 IsPageFlipInput(u8 direction)
 
     switch (direction)
     {
-    case 1:
+    case PSS_FLIP_RIGHT:
         if (JOY_NEW(DPAD_RIGHT))
             return TRUE;
 
@@ -1085,7 +1088,7 @@ bool32 IsPageFlipInput(u8 direction)
             return TRUE;
 
         break;
-    case 0:
+    case PSS_FLIP_LEFT:
         if (JOY_NEW(DPAD_LEFT))
             return TRUE;
 
@@ -1125,36 +1128,36 @@ static void Task_InputHandler_Info(u8 taskId)
 
         if (sMonSummaryScreen->curPageIndex != PSS_PAGE_MOVES_INFO)
         {
-            if (IsPageFlipInput(1) == TRUE)
+            if (IsPageFlipInput(PSS_FLIP_RIGHT) == TRUE)
             {
                 if (FuncIsActiveTask(Task_PokeSum_FlipPages))
                 {
-                    sMonSummaryScreen->lastPageFlipDirection = 1;
+                    sMonSummaryScreen->lastPageFlipDirection = PSS_FLIP_RIGHT;
                     return;
                 }
-                else if (sMonSummaryScreen->curPageIndex < PSS_PAGE_MOVES)
+                else if (sMonSummaryScreen->curPageIndex < PSS_PAGE_ABILITIES)
                 {
                     PlaySE(SE_SELECT);
                     HideBg(0);
-                    sMonSummaryScreen->pageFlipDirection = 1;
+                    sMonSummaryScreen->pageFlipDirection = PSS_FLIP_RIGHT;
                     PokeSum_RemoveWindows(sMonSummaryScreen->curPageIndex);
                     sMonSummaryScreen->curPageIndex++;
                     sMonSummaryScreen->state3270 = PSS_STATE3270_FLIPPAGES;
                 }
                 return;
             }
-            else if (IsPageFlipInput(0) == TRUE)
+            else if (IsPageFlipInput(PSS_FLIP_LEFT) == TRUE)
             {
                 if (FuncIsActiveTask(Task_PokeSum_FlipPages))
                 {
-                    sMonSummaryScreen->lastPageFlipDirection = 0;
+                    sMonSummaryScreen->lastPageFlipDirection = PSS_FLIP_LEFT;
                     return;
                 }
                 else if (sMonSummaryScreen->curPageIndex > PSS_PAGE_INFO)
                 {
                     PlaySE(SE_SELECT);
                     HideBg(0);
-                    sMonSummaryScreen->pageFlipDirection = 0;
+                    sMonSummaryScreen->pageFlipDirection = PSS_FLIP_LEFT;
                     PokeSum_RemoveWindows(sMonSummaryScreen->curPageIndex);
                     sMonSummaryScreen->curPageIndex--;
                     sMonSummaryScreen->state3270 = PSS_STATE3270_FLIPPAGES;
@@ -1185,11 +1188,12 @@ static void Task_InputHandler_Info(u8 taskId)
                 else if (sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES)
                 {
                     PlaySE(SE_SELECT);
-                    sMonSummaryScreen->pageFlipDirection = 1;
+                    sMonSummaryScreen->pageFlipDirection = PSS_FLIP_OUT;
                     PokeSum_RemoveWindows(sMonSummaryScreen->curPageIndex);
-                    sMonSummaryScreen->curPageIndex++;
+                    sMonSummaryScreen->curPageIndex = PSS_PAGE_MOVES_INFO;
                     sMonSummaryScreen->state3270 = PSS_STATE3270_FLIPPAGES;
                 }
+                // TODO: add case for abilities
                 return;
             }
             else if (JOY_NEW(B_BUTTON))
@@ -1247,7 +1251,8 @@ static void Task_PokeSum_FlipPages(u8 taskId)
     case 1:
         if (sMonSummaryScreen->curPageIndex != PSS_PAGE_MOVES_INFO)
         {
-            if (!(sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES && sMonSummaryScreen->pageFlipDirection == 0))
+            // TODO: add for abilities
+            if (!(sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES && sMonSummaryScreen->pageFlipDirection == PSS_FLIP_IN))
             {
                 FillBgTilemapBufferRect_Palette0(0, 0, 0, 0, 30, 20);
                 CopyBgTilemapBufferToVram(0);
@@ -1341,7 +1346,8 @@ static void Task_FlipPages_FromInfo(u8 taskId)
     case 1:
         if (sMonSummaryScreen->curPageIndex != PSS_PAGE_MOVES_INFO)
         {
-            if (!(sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES && sMonSummaryScreen->pageFlipDirection == 0))
+            // TODO: add for abilities
+            if (!(sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES && sMonSummaryScreen->pageFlipDirection == PSS_FLIP_IN))
             {
                 FillBgTilemapBufferRect_Palette0(0, 0, 0, 0, 30, 20);
                 CopyBgTilemapBufferToVram(0);
@@ -1451,7 +1457,8 @@ static void Task_BackOutOfSelectMove(u8 taskId)
         break;
     case 1:
         if (sMonSummaryScreen->curPageIndex != PSS_PAGE_MOVES_INFO) {
-            if (!(sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES && sMonSummaryScreen->pageFlipDirection == 0))
+            // TODO: add for abilities
+            if (!(sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES && sMonSummaryScreen->pageFlipDirection == PSS_FLIP_IN))
             {
                 FillBgTilemapBufferRect_Palette0(0, 0, 0, 0, 30, 20);
                 CopyBgTilemapBufferToVram(0);
@@ -1526,6 +1533,38 @@ static void Task_BackOutOfSelectMove(u8 taskId)
     return;
 }
 
+static u8 PokeSum_EffectiveFlipDirection(void)
+{
+    if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_LEFT || sMonSummaryScreen->pageFlipDirection == PSS_FLIP_IN)
+        return PSS_FLIP_LEFT;
+    if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT || sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
+        return PSS_FLIP_RIGHT;
+    return PSS_FLIP_OFF;
+}
+
+static u8 PokeSum_GetOldPage(void)
+{
+    switch (sMonSummaryScreen->pageFlipDirection)
+    {
+        case PSS_FLIP_RIGHT:
+            return sMonSummaryScreen->curPageIndex - 1;
+            break;
+        case PSS_FLIP_LEFT:
+            return sMonSummaryScreen->curPageIndex + 1;
+            break;
+        case PSS_FLIP_OUT:
+            if (sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES_INFO)
+                return PSS_PAGE_MOVES;
+            // TODO: add case for abilities
+            break;
+        case PSS_FLIP_IN:
+            if (sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES)
+                return PSS_PAGE_MOVES_INFO;
+            // TODO: add case for abilities
+            break;
+    }
+}
+
 static void PokeSum_SetHpExpBarCoordsFullRight(void)
 {
     u8 i;
@@ -1555,20 +1594,16 @@ static void PokeSum_SetHpExpBarCoordsFullLeft(void)
     }
 }
 
+
 static void PokeSum_InitBgCoordsBeforePageFlips(void)
 {
-    s8 pageDelta = 1;
-
-    if (sMonSummaryScreen->pageFlipDirection == 1)
-        pageDelta = -1;
-
-    if (sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES_INFO)
+    if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
     {
         sMonSummaryScreen->flipPagesBgHofs = 240;
         return;
     }
 
-    if ((sMonSummaryScreen->curPageIndex + pageDelta) == PSS_PAGE_MOVES_INFO)
+    if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_IN)
     {
         PokeSum_UpdateBgPriorityForPageFlip(0, 0);
         sMonSummaryScreen->flipPagesBgHofs = 0;
@@ -1577,7 +1612,7 @@ static void PokeSum_InitBgCoordsBeforePageFlips(void)
         return;
     }
 
-    if (sMonSummaryScreen->pageFlipDirection == 1)
+    if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
     {
         sMonSummaryScreen->flipPagesBgHofs = 0;
         SetGpuReg(REG_OFFSET_BG0HOFS, 0);
@@ -1585,7 +1620,7 @@ static void PokeSum_InitBgCoordsBeforePageFlips(void)
         SetGpuReg(REG_OFFSET_BG2HOFS, 0);
         PokeSum_UpdateBgPriorityForPageFlip(1, 1);
     }
-    else
+    else // sMonSummaryScreen->pageFlipDirection == PSS_FLIP_LEFT
     {
         u32 bg1Priority = GetGpuReg(REG_OFFSET_BG1CNT) & 3;
         u32 bg2Priority = GetGpuReg(REG_OFFSET_BG2CNT) & 3;
@@ -1602,26 +1637,21 @@ static void PokeSum_InitBgCoordsBeforePageFlips(void)
 
     if (sMonSummaryScreen->curPageIndex == PSS_PAGE_SKILLS)
     {
-        if (sMonSummaryScreen->pageFlipDirection == 1)
+        if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
             PokeSum_SetHpExpBarCoordsFullLeft();
         else
             PokeSum_SetHpExpBarCoordsFullRight();
     }
-    else if (sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES)
+    else if (sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES && sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
         PokeSum_SetHpExpBarCoordsFullLeft();
 
 }
 
 static void PokeSum_HideSpritesBeforePageFlip(void)
 {
-    u8 newPage;
+    u8 oldPage = PokeSum_GetOldPage();
 
-    if (sMonSummaryScreen->pageFlipDirection == 1)
-        newPage = sMonSummaryScreen->curPageIndex - 1;
-    else
-        newPage = sMonSummaryScreen->curPageIndex + 1;
-
-    switch (newPage)
+    switch (oldPage)
     {
     case PSS_PAGE_INFO:
         break;
@@ -1630,7 +1660,7 @@ static void PokeSum_HideSpritesBeforePageFlip(void)
         ShowOrHideExpBarObjs(TRUE);
         break;
     case PSS_PAGE_MOVES:
-        if (sMonSummaryScreen->pageFlipDirection == 1)
+        if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
         {
             PokeSum_ShowOrHideMonPicSprite(TRUE);
             PokeSum_ShowOrHideMonMarkingsSprite(TRUE);
@@ -1640,6 +1670,9 @@ static void PokeSum_HideSpritesBeforePageFlip(void)
             HideShowShinyStar(TRUE);
         }
 
+        break;
+    case PSS_PAGE_ABILITIES:
+        // TODO: do anything here?
         break;
     case PSS_PAGE_MOVES_INFO:
         ShoworHideMoveSelectionCursor(TRUE);
@@ -1653,14 +1686,9 @@ static void PokeSum_HideSpritesBeforePageFlip(void)
 
 static void PokeSum_ShowSpritesBeforePageFlip(void)
 {
-    u8 newPage;
+    u8 oldPage = PokeSum_GetOldPage();
 
-    if (sMonSummaryScreen->pageFlipDirection == 1)
-        newPage = sMonSummaryScreen->curPageIndex - 1;
-    else
-        newPage = sMonSummaryScreen->curPageIndex + 1;
-
-    switch (newPage)
+    switch (oldPage)
     {
     case PSS_PAGE_INFO:
         ShowOrHideHpBarObjs(FALSE);
@@ -1669,12 +1697,13 @@ static void PokeSum_ShowSpritesBeforePageFlip(void)
     case PSS_PAGE_SKILLS:
         break;
     case PSS_PAGE_MOVES:
-        if (sMonSummaryScreen->pageFlipDirection == 0)
+        if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_LEFT)
         {
             ShowOrHideHpBarObjs(FALSE);
             ShowOrHideExpBarObjs(FALSE);
         }
-        else
+        // TODO: case for direction 1 or 2
+        else if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
         {
             ShoworHideMoveSelectionCursor(FALSE);
             HideShowPokerusIcon(FALSE);
@@ -1682,6 +1711,9 @@ static void PokeSum_ShowSpritesBeforePageFlip(void)
             HideShowShinyStar(FALSE);
         }
 
+        break;
+    case PSS_PAGE_ABILITIES:
+        // TODO: implement
         break;
     case PSS_PAGE_MOVES_INFO:
         PokeSum_ShowOrHideMonPicSprite(FALSE);
@@ -1696,12 +1728,8 @@ static void PokeSum_ShowSpritesBeforePageFlip(void)
 
 static u8 PokeSum_IsPageFlipFinished(u8 a0)
 {
-    s8 pageDelta = 1;
-
-    if (sMonSummaryScreen->pageFlipDirection == 1)
-        pageDelta = -1;
-
-    if (sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES_INFO)
+    // TODO: add case for abilities_info
+    if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
         if (sMonSummaryScreen->flipPagesBgHofs <= 0)
         {
             sMonSummaryScreen->flipPagesBgHofs = 0;
@@ -1711,7 +1739,7 @@ static u8 PokeSum_IsPageFlipFinished(u8 a0)
             return TRUE;
         }
 
-    if ((sMonSummaryScreen->curPageIndex + pageDelta) == PSS_PAGE_MOVES_INFO)
+    if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_IN)
         if (sMonSummaryScreen->flipPagesBgHofs >= 240)
         {
             sMonSummaryScreen->flipPagesBgHofs = 240;
@@ -1720,7 +1748,7 @@ static u8 PokeSum_IsPageFlipFinished(u8 a0)
             return TRUE;
         }
 
-    if (sMonSummaryScreen->pageFlipDirection == 1)
+    if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
     {
         if (sMonSummaryScreen->flipPagesBgHofs >= 240)
         {
@@ -1753,7 +1781,7 @@ static void PokeSum_UpdateBgPriorityForPageFlip(u8 setBg0Priority, u8 keepBg1Bg2
     bg1Priority = GetGpuReg(REG_OFFSET_BG1CNT) & 3;
     bg2Priority = GetGpuReg(REG_OFFSET_BG2CNT) & 3;
 
-    if (sMonSummaryScreen->pageFlipDirection == 1)
+    if (PokeSum_EffectiveFlipDirection() == PSS_FLIP_RIGHT)
     {
         if (setBg0Priority == 0)
         {
@@ -1795,7 +1823,7 @@ static void PokeSum_UpdateBgPriorityForPageFlip(u8 setBg0Priority, u8 keepBg1Bg2
         }
     }
 
-    if (sMonSummaryScreen->pageFlipDirection == 0)
+    if (PokeSum_EffectiveFlipDirection() == PSS_FLIP_LEFT)
     {
         bg0Priority = 0;
         if (bg1Priority > bg2Priority)
@@ -1806,7 +1834,7 @@ static void PokeSum_UpdateBgPriorityForPageFlip(u8 setBg0Priority, u8 keepBg1Bg2
 
     for (i = 0; i < 11; i++)
     {
-        if (sMonSummaryScreen->curPageIndex == PSS_PAGE_SKILLS && sMonSummaryScreen->pageFlipDirection == 1)
+        if (sMonSummaryScreen->curPageIndex == PSS_PAGE_SKILLS && sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
             sExpBarObjs->sprites[i]->oam.priority = bg0Priority;
         else
             sExpBarObjs->sprites[i]->oam.priority = bg1Priority;
@@ -1814,7 +1842,7 @@ static void PokeSum_UpdateBgPriorityForPageFlip(u8 setBg0Priority, u8 keepBg1Bg2
         if (i >= 9)
             continue;
 
-        if (sMonSummaryScreen->curPageIndex == PSS_PAGE_SKILLS && sMonSummaryScreen->pageFlipDirection == 1)
+        if (sMonSummaryScreen->curPageIndex == PSS_PAGE_SKILLS && sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
             sHpBarObjs->sprites[i]->oam.priority = bg0Priority;
         else
             sHpBarObjs->sprites[i]->oam.priority = bg1Priority;
@@ -1827,30 +1855,36 @@ static void PokeSum_UpdateBgPriorityForPageFlip(u8 setBg0Priority, u8 keepBg1Bg2
 
 static void PokeSum_CopyNewBgTilemapBeforePageFlip_2(void)
 {
-    u8 newPage;
+    u8 oldPage = PokeSum_GetOldPage();
 
-    if (sMonSummaryScreen->pageFlipDirection == 1)
-        newPage = sMonSummaryScreen->curPageIndex - 1;
-    else
-        newPage = sMonSummaryScreen->curPageIndex + 1;
-
-    switch (newPage)
+    switch (oldPage)
     {
     case PSS_PAGE_INFO:
         CopyToBgTilemapBuffer(sMonSummaryScreen->infoAndMovesPageBgNum, gBgTilemap_TrainerMemo_Stats, 0, 0);
         break;
     case PSS_PAGE_SKILLS:
-        if (sMonSummaryScreen->pageFlipDirection == 1)
+        if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
             CopyToBgTilemapBuffer(sMonSummaryScreen->skillsPageBgNum, gBgTilemap_PokeSum_MovesListForDelete, 0, 0);
         else
             CopyToBgTilemapBuffer(sMonSummaryScreen->skillsPageBgNum, gBgTilemap_TrainerMemo_Details, 0, 0);
 
         break;
     case PSS_PAGE_MOVES:
-        if (sMonSummaryScreen->pageFlipDirection == 1)
+        if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
             CopyToBgTilemapBuffer(sMonSummaryScreen->infoAndMovesPageBgNum, gBgTilemap_PokeSum_MoveDetailsForDelete, 0, 0);
+        else if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
+            // TODO: change for abilities
+            CopyToBgTilemapBuffer(sMonSummaryScreen->infoAndMovesPageBgNum, gBgTilemap_PokeSum_MovesListForDelete, 0, 0);
         else
             CopyToBgTilemapBuffer(sMonSummaryScreen->infoAndMovesPageBgNum, gBgTilemap_TrainerMemo_Stats, 0, 0);
+
+        break;
+    case PSS_PAGE_ABILITIES:
+        if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
+            // TODO: fix this
+            CopyToBgTilemapBuffer(sMonSummaryScreen->infoAndMovesPageBgNum, gBgTilemap_PokeSum_MoveDetailsForDelete, 0, 0);
+        else
+            CopyToBgTilemapBuffer(sMonSummaryScreen->skillsPageBgNum, gBgTilemap_PokeSum_MovesListForDelete, 0, 0);
 
         break;
     case PSS_PAGE_MOVES_INFO:
@@ -1861,14 +1895,9 @@ static void PokeSum_CopyNewBgTilemapBeforePageFlip_2(void)
 
 static void PokeSum_CopyNewBgTilemapBeforePageFlip(void)
 {
-    u8 newPage;
+    u8 oldPage = PokeSum_GetOldPage();
 
-    if (sMonSummaryScreen->pageFlipDirection == 1)
-        newPage = sMonSummaryScreen->curPageIndex - 1;
-    else
-        newPage = sMonSummaryScreen->curPageIndex + 1;
-
-    switch (newPage)
+    switch (oldPage)
     {
     case PSS_PAGE_INFO:
         CopyToBgTilemapBuffer(sMonSummaryScreen->infoAndMovesPageBgNum, gBgTilemap_TrainerMemo_Stats, 0, 0);
@@ -1876,7 +1905,16 @@ static void PokeSum_CopyNewBgTilemapBeforePageFlip(void)
     case PSS_PAGE_SKILLS:
         break;
     case PSS_PAGE_MOVES:
-        if (sMonSummaryScreen->pageFlipDirection == 1)
+        // TODO: cases for 1 and 2
+        if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
+            CopyToBgTilemapBuffer(3, sBgTilemap_MovesPage, 0, 0);
+        else if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_LEFT)
+            CopyToBgTilemapBuffer(3, sBgTilemap_MovesInfoPage, 0, 0);
+
+        break;
+    case PSS_PAGE_ABILITIES:
+        // TODO: fix this
+        if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
             CopyToBgTilemapBuffer(3, sBgTilemap_MovesPage, 0, 0);
         else
             CopyToBgTilemapBuffer(3, sBgTilemap_MovesInfoPage, 0, 0);
@@ -2457,6 +2495,11 @@ static void PokeSum_PrintRightPaneText(void)
     case PSS_PAGE_MOVES_INFO:
         PrintMovesPage();
         break;
+    case PSS_PAGE_ABILITIES:
+        // TODO: fix this
+        PrintMovesPage();
+        // PrintAbilitiesPage();
+        break;
     }
 
     PutWindowTilemap(sMonSummaryScreen->windowIds[POKESUM_WIN_RIGHT_PANE]);
@@ -2511,6 +2554,7 @@ static void PrintSkillsPage(void)
 #define GetMoveNamePrinterYpos(x) ((x) * 28 + 5)
 #define GetMovePpPinterYpos(x) ((x) * 28 + 16)
 
+// TODO: copy for abilities
 static void PrintMovesPage(void)
 {
     u8 i;
@@ -2593,6 +2637,8 @@ static void PokeSum_PrintBottomPaneText(void)
         PokeSum_PrintSelectedMoveStats();
         break;
     case PSS_PAGE_MOVES:
+        break;
+    case PSS_PAGE_ABILITIES:
         break;
     }
 
@@ -2890,6 +2936,10 @@ static void PokeSum_PrintAbilityDataOrMoveTypes(void)
     case PSS_PAGE_MOVES_INFO:
         PokeSum_DrawMoveTypeIcons();
         break;
+    case PSS_PAGE_ABILITIES:
+        // TODO: fix
+        PokeSum_DrawMoveTypeIcons();
+        break;
     }
 
     PutWindowTilemap(sMonSummaryScreen->windowIds[5]);
@@ -2955,6 +3005,12 @@ static void PokeSum_PrintPageHeaderText(u8 curPageIndex)
             PokeSum_PrintControlsString(gText_PokeSum_Controls_PickSwitch);
         else
             PokeSum_PrintControlsString(gText_PokeSum_Controls_Pick);
+        PrintMonLevelNickOnWindow2(gText_PokeSum_NoData);
+        break;
+    case PSS_PAGE_ABILITIES:
+        // TODO: fix
+        PokeSum_PrintPageName(gText_PokeSum_PageName_EquippedAbilities);
+        PokeSum_PrintControlsString(gText_PokeSum_Controls_PageDetail);
         PrintMonLevelNickOnWindow2(gText_PokeSum_NoData);
         break;
     case PSS_PAGE_MOVE_DELETER:
@@ -3070,7 +3126,7 @@ static void PokeSum_FlipPages_SlideLayerLeft(void)
     }
 }
 
-static void PokeSum_FlipPages_SlideLayeRight(void)
+static void PokeSum_FlipPages_SlideLayerRight(void)
 {
     if (sMonSummaryScreen->flipPagesBgHofs >= 60)
     {
@@ -3090,30 +3146,24 @@ static void PokeSum_FlipPages_SlideLayeRight(void)
 
 static void PokeSum_FlipPages_HandleBgHofs(void)
 {
-    if (sMonSummaryScreen->pageFlipDirection == 1) // Right
-    {
-        if (sMonSummaryScreen->curPageIndex != PSS_PAGE_MOVES_INFO)
+    if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
             PokeSum_FlipPages_SlideLayerLeft();
-        else
-            PokeSum_FlipPages_SlideLayeRight();
-    }
-    else
-    {
-        if (sMonSummaryScreen->curPageIndex != PSS_PAGE_MOVES)
-            PokeSum_FlipPages_SlideLayeRight();
-        else
+    else if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_LEFT)
+            PokeSum_FlipPages_SlideLayerRight();
+    else if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_OUT)
+            PokeSum_FlipPages_SlideLayerRight();
+    else if (sMonSummaryScreen->pageFlipDirection == PSS_FLIP_IN)
             PokeSum_FlipPages_SlideLayerLeft();
-    }
 }
 
 static void PokeSum_FlipPages_HandleHpExpBarSprites(void)
 {
     if (sMonSummaryScreen->curPageIndex == PSS_PAGE_SKILLS
-        && sMonSummaryScreen->pageFlipDirection == 0)
+        && sMonSummaryScreen->pageFlipDirection == PSS_FLIP_LEFT)
         PokeSum_FlipPages_SlideHpExpBarsIn();
 
     if (sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES
-        && sMonSummaryScreen->pageFlipDirection == 1)
+        && sMonSummaryScreen->pageFlipDirection == PSS_FLIP_RIGHT)
         PokeSum_FlipPages_SlideHpExpBarsOut();
 }
 
@@ -3163,6 +3213,10 @@ static void PokeSum_CreateWindows(void)
         case PSS_PAGE_MOVES_INFO:
             sMonSummaryScreen->windowIds[i + 3] = AddWindow(&sWindowTemplates_Moves[i]);
             break;
+        case PSS_PAGE_ABILITIES:
+            // TODO: fix
+            sMonSummaryScreen->windowIds[i + 3] = AddWindow(&sWindowTemplates_Moves[i]);
+            break;
         default:
             break;
         }
@@ -3177,8 +3231,8 @@ static void PokeSum_AddWindows(u8 curPageIndex)
     for (i = 0; i < 7; i++)
         sMonSummaryScreen->windowIds[i] = 0xff;
 
-    if ((sMonSummaryScreen->pageFlipDirection == 1 && sMonSummaryScreen->curPageIndex != PSS_PAGE_MOVES_INFO)
-        || (sMonSummaryScreen->pageFlipDirection == 0 && sMonSummaryScreen->curPageIndex == PSS_PAGE_MOVES))
+    // TODO: add for abilities
+    if (PokeSum_EffectiveFlipDirection() == PSS_FLIP_RIGHT || sMonSummaryScreen->pageFlipDirection == PSS_FLIP_IN)
     {
         if (bgPriority2 > bgPriority1)
             for (i = 0; i < 3; i++)
@@ -3211,6 +3265,10 @@ static void PokeSum_AddWindows(u8 curPageIndex)
         case PSS_PAGE_MOVES_INFO:
             sMonSummaryScreen->windowIds[i + 3] = AddWindow(&sWindowTemplates_Moves[i]);
             break;
+        case PSS_PAGE_ABILITIES:
+            // TODO: fix
+            sMonSummaryScreen->windowIds[i + 3] = AddWindow(&sWindowTemplates_Moves[i]);
+            break;
         }
 }
 
@@ -3235,6 +3293,10 @@ static void PokeSum_SetHelpContext(void)
         break;
     case PSS_PAGE_MOVES:
     case PSS_PAGE_MOVES_INFO:
+        SetHelpContext(HELPCONTEXT_POKEMON_MOVES);
+        break;
+    case PSS_PAGE_ABILITIES:
+        // TODO: implement help context for pokemon abilities
         SetHelpContext(HELPCONTEXT_POKEMON_MOVES);
         break;
     }
@@ -3330,6 +3392,21 @@ static void PokeSum_DrawBg3Tilemap(void)
         FillBgTilemapBufferRect(3, 48 + SUB_8138538_BASE_TILE_NUM, 18, 0, 1, 1, 0);
         FillBgTilemapBufferRect(3, 64 + SUB_8138538_BASE_TILE_NUM, 18, 1, 1, 1, 0);
         break;
+    case PSS_PAGE_ABILITIES:
+        // TODO: fix
+        FillBgTilemapBufferRect(3, 49 + SUB_8138538_BASE_TILE_NUM, 13, 0, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 65 + SUB_8138538_BASE_TILE_NUM, 13, 1, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 1 + SUB_8138538_BASE_TILE_NUM, 14, 0, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 19 + SUB_8138538_BASE_TILE_NUM, 14, 1, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 49 + SUB_8138538_BASE_TILE_NUM, 15, 0, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 65 + SUB_8138538_BASE_TILE_NUM, 15, 1, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 1 + SUB_8138538_BASE_TILE_NUM, 16, 0, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 19 + SUB_8138538_BASE_TILE_NUM, 16, 1, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 17 + SUB_8138538_BASE_TILE_NUM, 17, 0, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 33 + SUB_8138538_BASE_TILE_NUM, 17, 1, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 48 + SUB_8138538_BASE_TILE_NUM, 18, 0, 1, 1, 0);
+        FillBgTilemapBufferRect(3, 64 + SUB_8138538_BASE_TILE_NUM, 18, 1, 1, 1, 0);
+        break;
     case PSS_PAGE_MOVES_INFO:
         if (sMonSummaryScreen->mode == PSS_MODE_SELECT_MOVE)
         {
@@ -3371,6 +3448,8 @@ static void PokeSum_PrintMonTypeIcons(void)
     case PSS_PAGE_SKILLS:
         break;
     case PSS_PAGE_MOVES:
+        break;
+    case PSS_PAGE_ABILITIES:
         break;
     case PSS_PAGE_MOVES_INFO:
         FillWindowPixelBuffer(sMonSummaryScreen->windowIds[6], 0);
@@ -3592,9 +3671,9 @@ static void Task_HandleInput_SelectMove(u8 taskId)
                 sMoveSwapCursorPos = 0;
                 sMonSummaryScreen->isSwappingMoves = FALSE;
                 ShoworHideMoveSelectionCursor(TRUE);
-                sMonSummaryScreen->pageFlipDirection = 0;
+                sMonSummaryScreen->pageFlipDirection = PSS_FLIP_IN;
                 PokeSum_RemoveWindows(sMonSummaryScreen->curPageIndex);
-                sMonSummaryScreen->curPageIndex--;
+                sMonSummaryScreen->curPageIndex = PSS_PAGE_MOVES;
                 sMonSummaryScreen->selectMoveInputHandlerState = 1;
                 return;
             }
@@ -3644,9 +3723,9 @@ static void Task_HandleInput_SelectMove(u8 taskId)
             }
 
             ShoworHideMoveSelectionCursor(TRUE);
-            sMonSummaryScreen->pageFlipDirection = 0;
+            sMonSummaryScreen->pageFlipDirection = PSS_FLIP_IN;
             PokeSum_RemoveWindows(sMonSummaryScreen->curPageIndex);
-            sMonSummaryScreen->curPageIndex--;
+            sMonSummaryScreen->curPageIndex = PSS_PAGE_MOVES;
             sMonSummaryScreen->selectMoveInputHandlerState = 1;
         }
         break;
@@ -4961,7 +5040,7 @@ static s8 SeekToNextMonInSingleParty(s8 direction)
     struct Pokemon * partyMons = sMonSummaryScreen->monList.mons;
     s8 seekDelta = 0;
 
-    if (sMonSummaryScreen->curPageIndex == 0)
+    if (sMonSummaryScreen->curPageIndex == PSS_PAGE_INFO)
     {
         if (direction == -1 && sLastViewedMonIndex == 0)
             return -1;
@@ -5169,6 +5248,7 @@ static void PokeSum_UpdateWin1ActiveFlag(u8 curPageIndex)
     case PSS_PAGE_INFO:
     case PSS_PAGE_SKILLS:
     case PSS_PAGE_MOVES:
+    case PSS_PAGE_ABILITIES:
         SetGpuReg(REG_OFFSET_DISPCNT, GetGpuReg(REG_OFFSET_DISPCNT) | DISPCNT_WIN1_ON);
         break;
     default:

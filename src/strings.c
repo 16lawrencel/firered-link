@@ -831,6 +831,7 @@ const u8 gText_Somewhere[] = _("Somewhere");
 const u8 gText_PokeSum_PageName_PokemonInfo[] = _("POKéMON INFO");
 const u8 gText_PokeSum_PageName_PokemonSkills[] = _("POKéMON SKILLS");
 const u8 gText_PokeSum_PageName_KnownMoves[] = _("KNOWN MOVES");
+const u8 gText_PokeSum_PageName_EquippedAbilities[] = _("ABILITIES");
 const u8 gText_PokeSum_NoData[] = _("No data");
 const u8 gText_PokeSum_ExpPoints[] = _("EXP. POINTS");
 const u8 gText_PokeSum_NextLv[] = _("NEXT LV.");

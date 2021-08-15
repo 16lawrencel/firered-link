@@ -28,9 +28,11 @@ enum PokemonSummaryScreenMode
 
 enum PokemonSummaryScreenPage
 {
+    // INFO -> ABILITIES have to be in order
     PSS_PAGE_INFO,
     PSS_PAGE_SKILLS,
     PSS_PAGE_MOVES,
+    PSS_PAGE_ABILITIES,
     PSS_PAGE_MOVES_INFO,
     PSS_PAGE_UNK4,
     PSS_PAGE_MOVE_DELETER,
@@ -45,6 +47,15 @@ enum PokemonSummaryScreenState3270
     PSS_STATE3270_ATEXIT_FADEOUT,
     PSS_STATE3270_ATEXIT_WAITLINKDELAY,
     PSS_STATE3270_ATEXIT_WAITFADE
+};
+
+enum PokemonSummaryPageFlipDirection
+{
+    PSS_FLIP_LEFT,
+    PSS_FLIP_RIGHT,
+    PSS_FLIP_OUT, // moves -> moves_info
+    PSS_FLIP_IN, // moves_info -> moves
+    PSS_FLIP_OFF
 };
 
 enum PokemonSummaryScreenStat
