@@ -2971,6 +2971,12 @@ u32 GetBoxMonData(struct BoxPokemon *boxMon, s32 field, u8 *data)
     case MON_DATA_MOVE4:
         retVal = substruct1->moves[field - MON_DATA_MOVE1];
         break;
+    case MON_DATA_ABILITY1:
+    case MON_DATA_ABILITY2:
+    case MON_DATA_ABILITY3:
+    case MON_DATA_ABILITY4:
+        retVal = substruct4->abilities[field - MON_DATA_ABILITY1];
+        break;
     case MON_DATA_PP1:
     case MON_DATA_PP2:
     case MON_DATA_PP3:
