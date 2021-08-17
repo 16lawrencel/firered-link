@@ -203,6 +203,7 @@ struct BattlePokemon
     /*0x4C*/ u32 status1;
     /*0x50*/ u32 status2;
     /*0x54*/ u32 otId;
+    /*0x58*/ u16 abilities[4];
 };
 
 struct BaseStats

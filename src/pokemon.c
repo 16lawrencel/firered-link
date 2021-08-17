@@ -81,6 +81,7 @@ static void EncryptBoxMon(struct BoxPokemon *boxMon);
 static void DeleteFirstMoveAndGiveMoveToBoxMon(struct BoxPokemon *boxMon, u16 move);
 static void GiveBoxMonInitialMoveset(struct BoxPokemon *boxMon);
 static u16 GiveMoveToBoxMon(struct BoxPokemon *boxMon, u16 move);
+static void GiveBoxMonInitialAbilityset(struct BoxPokemon *boxMon);
 static u8 GetLevelFromMonExp(struct Pokemon *mon);
 static u16 CalculateBoxMonChecksum(struct BoxPokemon *boxMon);
 
@@ -1817,6 +1818,7 @@ void CreateBoxMon(struct BoxPokemon *boxMon, u16 species, u8 level, u8 fixedIV, 
     }
 
     GiveBoxMonInitialMoveset(boxMon);
+    GiveBoxMonInitialAbilityset(boxMon);
 }
 
 void CreateMonWithNature(struct Pokemon *mon, u16 species, u8 level, u8 fixedIV, u8 nature)
@@ -2325,6 +2327,15 @@ static void DeleteFirstMoveAndGiveMoveToBoxMon(struct BoxPokemon *boxMon, u16 mo
     }
 
     SetBoxMonData(boxMon, MON_DATA_PP_BONUSES, &ppBonuses);
+}
+
+static void GiveBoxMonInitialAbilityset(struct BoxPokemon *boxMon)
+{
+    u16 species = GetBoxMonData(boxMon, MON_DATA_SPECIES, NULL);
+    u16 abilityNum = GetBoxMonData(boxMon, MON_DATA_ABILITY_NUM, NULL);
+    u16 abilityId = GetAbilityBySpecies(species, abilityNum);
+
+    SetBoxMonData(boxMon, MON_DATA_ABILITY1, &abilityId);
 }
 
 #define APPLY_STAT_MOD(var, mon, stat, statIndex)                                   \
@@ -3372,6 +3383,12 @@ void SetBoxMonData(struct BoxPokemon *boxMon, s32 field, const void *dataArg)
     case MON_DATA_MOVE4:
         SET16(substruct1->moves[field - MON_DATA_MOVE1]);
         break;
+    case MON_DATA_ABILITY1:
+    case MON_DATA_ABILITY2:
+    case MON_DATA_ABILITY3:
+    case MON_DATA_ABILITY4:
+        SET16(substruct4->abilities[field - MON_DATA_ABILITY1]);
+        break;
     case MON_DATA_PP1:
     case MON_DATA_PP2:
     case MON_DATA_PP3:
@@ -3797,6 +3814,7 @@ static void CopyPlayerPartyMonToBattleData(u8 battlerId, u8 partyIndex)
     {
         gBattleMons[battlerId].moves[i] = GetMonData(&gPlayerParty[partyIndex], MON_DATA_MOVE1 + i, NULL);
         gBattleMons[battlerId].pp[i] = GetMonData(&gPlayerParty[partyIndex], MON_DATA_PP1 + i, NULL);
+        gBattleMons[battlerId].abilities[i] = GetMonData(&gPlayerParty[partyIndex], MON_DATA_ABILITY1 + i, NULL);
     }
 
     gBattleMons[battlerId].ppBonuses = GetMonData(&gPlayerParty[partyIndex], MON_DATA_PP_BONUSES, NULL);
